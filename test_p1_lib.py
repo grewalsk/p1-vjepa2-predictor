@@ -360,6 +360,85 @@ def test_assert_frame_causal_passes_and_catches():
         raised = True
     check("assert_frame_causal: trips on a non-causal model", raised)
 
+# ---------------------------------------------------------------------------
+# v4: estimators from the Phase-2a adversarial review (constructive counterexamples
+# from the review become the ground truth here)
+# ---------------------------------------------------------------------------
+def _token_diverse_linear_model(S=64, T=32, D=128, q=7, K=5, seed=4):
+    """d_st = G_t (J a_s), G_t = sum_k C[t,k] H_k: a STRICTLY q-dim linear action code
+    with token-diverse linear readouts. Pooled rank ~ q(K+1) > q; mode-s rank == q."""
+    g = torch.Generator().manual_seed(seed)
+    A = torch.randn(S, q, generator=g)
+    J = torch.randn(q, D, generator=g) / D ** 0.5
+    H = torch.randn(K + 1, D, D, generator=g) / D ** 0.5
+    C = torch.randn(T, K + 1, generator=g)
+    G = torch.einsum('tk,kde->tde', C, H)
+    d = torch.einsum('sd,tde->ste', A @ J, G)          # (S, T, D)
+    return A, d
+
+def test_mode_s_beats_pooled_on_linear_null():
+    q, K = 7, 5
+    A, d = _token_diverse_linear_model(q=q, K=K)
+    lam_s = P.mode_s_spectrum(d)
+    nr_s = P.numerical_rank(lam_s, rel_thresh=1e-6)
+    lam_p = P.pooled_diff_spectrum(d)
+    nr_p = P.numerical_rank(lam_p, rel_thresh=1e-6)
+    check("mode-s: rank == q under token-diverse LINEAR readout (no false expansion)",
+          nr_s == q, f"{nr_s} vs {q}")
+    check("pooled: rank exceeds q under the SAME strictly-linear model (the trap)",
+          nr_p > q, f"{nr_p} > {q}; linear null is q(K+1) = {q*(K+1)}")
+
+def test_mode_s_detects_true_code_expansion():
+    # add a quadratic code channel: mode-s rank must rise above q
+    q, K = 7, 5
+    g = torch.Generator().manual_seed(5)
+    A, d = _token_diverse_linear_model(q=q, K=K, seed=5)
+    D = d.shape[-1]
+    v = torch.randn(d.shape[1], D, generator=g) / D ** 0.5   # token-varying quadratic readout
+    quad = (A[:, 0] ** 2 - (A[:, 0] ** 2).mean())            # a genuine extra code dim
+    d2 = d + 0.5 * torch.einsum('s,td->std', quad, v)
+    nr = P.numerical_rank(P.mode_s_spectrum(d2), rel_thresh=1e-6)
+    check("mode-s: detects a genuine extra (quadratic) code dimension", nr == q + 1, f"{nr} vs {q+1}")
+
+def test_even_part_fraction_linear_zero_quadratic_positive():
+    S, T, D, q = 32, 4, 64, 7
+    g = torch.Generator().manual_seed(6)
+    A = torch.randn(S, q, generator=g)
+    Jl = torch.randn(q, D, generator=g); Jq = torch.randn(q, D, generator=g)
+    lin_p = (A @ Jl).unsqueeze(1).repeat(1, T, 1); lin_m = (-A @ Jl).unsqueeze(1).repeat(1, T, 1)
+    check("even_part_fraction: exactly 0 for a linear response",
+          P.even_part_fraction(lin_p, lin_m) < 1e-10)
+    ev = ((A ** 2) @ Jq).unsqueeze(1).repeat(1, T, 1)
+    f = P.even_part_fraction(lin_p + ev, lin_m + ev)
+    check("even_part_fraction: positive when an even component is present", f > 0.01, f"{f:.4f}")
+
+def test_per_token_centering_removes_footprint():
+    # rank-1 action signal + large token-dependent constant offsets (spatial footprint).
+    S, T, D = 48, 24, 96
+    g = torch.Generator().manual_seed(7)
+    s = torch.randn(S, generator=g); v = torch.randn(D, generator=g); v = v / v.norm()
+    U = torch.randn(T, D, generator=g) * 10.0            # big static footprint, no action dep
+    d = torch.einsum('s,d->sd', s, v).unsqueeze(1) + U.unsqueeze(0)
+    nr_tok = P.numerical_rank(P.pooled_diff_spectrum(d), rel_thresh=1e-6)
+    lam_grand = P.spectrum(d.reshape(-1, D), center=True)   # grand-mean centering (old way)
+    nr_grand = P.numerical_rank(lam_grand, rel_thresh=1e-6)
+    check("per-token centering: footprint removed, true rank 1 recovered", nr_tok == 1, str(nr_tok))
+    check("grand-mean centering: footprint contaminates the spectrum (old estimator)",
+          nr_grand > 1, str(nr_grand))
+
+def test_variance_fraction_scale_invariant():
+    g = torch.Generator().manual_seed(8)
+    a = torch.randn(16, 10, 32, generator=g)
+    f1, f2 = P.variance_fraction(a), P.variance_fraction(10.0 * a)
+    check("variance_fraction: scale-invariant (kills the norm-growth confound)",
+          abs(f1 - f2) / max(f1, 1e-12) < 1e-5, f"{f1:.8f} vs {f2:.8f}")
+
+def test_ln_normalized_unit_stats():
+    a = torch.randn(5, 7, 64) * 50 + 3
+    n = P.ln_normalized(a)
+    check("ln_normalized: per-vector mean ~0 and std ~1",
+          float(n.mean(-1).abs().max()) < 1e-4 and abs(float(n.std(-1).mean()) - 1) < 1e-2)
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for t in tests:

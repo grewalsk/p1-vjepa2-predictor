@@ -433,3 +433,62 @@ Metric changes mandated for 2b (pre-committed before 2b runs):
 
 An adversarial review of these three reads is running; its verdicts amend this section when
 they land, before 2b is executed.
+
+### 10.1 Adversarial review verdicts (2026-07-23, recorded before 2b runs)
+
+Three independent skeptics; the first refuted constructively by simulation. All three
+headline reads: the OBSERVATIONS survive, the MECHANISTIC INFERENCES do not.
+
+**Killed.**
+- "Pooled PR > 7 demonstrates nonlinear expansion beyond the input head's 7-dim image."
+  A strictly linear rank-7-code model with token-diverse linear readouts (d_st = G_t J a_s)
+  reproduces the observed pooled PR 50-108; the linear null for the pooled statistic is
+  q(K+1) (K = token-context dims, simulated rank exactly 7(K+1)), not q. Exceeding 7 is
+  mechanically expected of any transformer with a shared low-dim injection. Our estimator
+  also used grand-mean centering, which leaves the rank-<=T-1 spatial footprint inside the
+  covariance (verified: it inflates rank in simulation and in our new unit test).
+- "Raw variance growth with depth = increasing action integration." The entire late-block
+  explosion is accounted for by ~1.28x/block pre-LN residual-norm growth (implied per-block
+  RMS factors 1.29/1.35/1.20); the state control rises too; and our own scale-free
+  action/state ratio DECLINES with depth (97 -> 33), contradicting the raw-metric reading.
+  The H1b corollary was structurally invalid: cumulative residual variance is monotone by
+  construction; localization is only judgeable on per-block writes (h_l - h_{l-1}).
+- "Action/state ratio >= 30 shows action-specific routing." The comparison was uncalibrated
+  (+-0.075 is ~1 sigma for actions, a small off-manifold nudge for an absolute pose); the
+  state token is largely redundant with the visible arm in the frozen frame, so ANY
+  conditioning scheme predicts a large ratio at this operating point; and the depth profile
+  (maximal at blk0, monotone decay) is the input-gain-plus-dilution signature, not routing.
+
+**Survives.** The action signal is real and attributable to the action input specifically
+(the narrow pre-registered purpose of the state-swap control); pooled action-diff variance
+concentrates in ~10-100 of 1024 dims as measured; a weak "higher-dimensional with depth"
+holds via scale-invariant PR only.
+
+**Estimator corrections adopted (p1_lib v4, analytically unit-tested against the review's
+constructive models):** per_token_centered / pooled_diff_spectrum (per-token centering),
+mode_s_spectrum (the code-expansion test; <= q under any per-token linear readout of a
+q-dim code), even_part_fraction (antithetic +-a nonlinearity meter; exactly 0 for linear),
+variance_fraction (scale-invariant depth-comparable variance), ln_normalized (the
+read-relevant view of the stream).
+
+**Triaged into the 2b pilot** (in addition to Section 10's five): per-token centering
+everywhere; variance fractions and LN-normalized variants only, never raw traces across
+depth; mode-s unfolding per block; antithetic pairs; per-block write attribution
+(h_l - h_{l-1}); true on-manifold state null (resampled real states); matched-norm action
+comparator; trivial-gain baseline ||W_a||_F^2/||W_s||_F^2 from the checkpoint with the
+excess ratio; operating-point spread (sweep centered at 0 and at a_real); spectral parity
+for the control.
+
+**Deferred to the main run:** per-token ridge R^2 + residual spectra; cross-token principal
+angles and the K estimate (with the 7(K+1) null prediction); S-saturation curves at probe
+blocks; Marchenko-Pastur-calibrated rank thresholds; post-predictor_norm metrics and the
+formatting-vs-content patching check; direct attention-mass routing readout with edge
+ablations (Arm B territory).
+
+**Parallel gate criterion (added per Section 8 rules; the original stands and both are
+reported).** Dated 2026-07-23: p1.action_excess_ratio_norm_matched_min : 3.0. Justification:
+the raw action/state ratio conflates input-head gain with routing; the norm-matched excess
+ratio (state perturbations rescaled so the embedding-space step matches the paired action
+embedding step, or equivalently the measured ratio divided by ||W_a||_F^2/||W_s||_F^2 for
+box sweeps) is the calibrated form, required >= 3.0 at the peak block with bootstrap CI,
+robust across >= 3 operating points.

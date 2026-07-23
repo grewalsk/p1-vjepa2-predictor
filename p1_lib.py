@@ -459,6 +459,78 @@ def assert_frame_causal(predictor, B=2, T=4, HW=256, d_enc=1408,
     assert float(d[perturb_frame]) > 0, "action had no forward effect; wiring is wrong"
     return {"per_frame_max_delta": [float(v) for v in d], "passed": True}
 
+# =====================================================================================
+# [P1ADD-v4] Estimators mandated by the Phase-2a adversarial review (2026-07-23).
+#
+# Constructively shown by simulation during the review: pooled (action x token) diff rank
+# exceeding action_dim carries NO evidence of action-code expansion; a strictly linear
+# 7-dim-code model with token-diverse linear readouts (d_st = G_t J a_s) reproduces pooled
+# PR 50-108, because the linear null for the pooled statistic is q(K+1) (K = token-context
+# dims), not q. The statistic that tests code expansion is the mode-s unfolding below.
+# Raw variance across depth is confounded by pre-LN residual norm growth (~1.3x/block);
+# only fractions and LN-normalized variants are comparable across blocks. Grand-mean
+# centering leaves the (rank <= T-1) spatial footprint inside the pooled covariance;
+# center per token. H1b localization must be judged on per-block WRITES (h_l - h_{l-1}).
+# =====================================================================================
+
+def per_token_centered(acts, exclude_positions=None):
+    """(n_act, n_tok, d) -> (n_act, n_keep, d) with EACH kept token's mean over actions
+    removed. Removes the between-token mean footprint that grand-mean centering leaves in."""
+    a = acts.detach().float()
+    keep = _keep_tokens(a.shape[1], exclude_positions)
+    a = a[:, keep, :]
+    return a - a.mean(dim=0, keepdim=True)
+
+def pooled_diff_spectrum(acts, exclude_positions=None):
+    """PRIMARY pooled spectrum: per-token-centered, pooled over (action x token).
+    CAUTION (linear null): rank here caps at q(K+1) under a q-dim code with token-diverse
+    linear readouts; exceeding q is NOT evidence of code expansion. Use mode_s_spectrum
+    for that question."""
+    c = per_token_centered(acts, exclude_positions)
+    return spectrum(c.reshape(-1, c.shape[-1]), center=False)
+
+def mode_s_spectrum(acts, exclude_positions=None):
+    """Mode-s unfolding: rows = actions, columns = concatenated (token, dim) coordinates,
+    eigenvalues via the S x S Gram (cheap). Under ANY model d_st = R_t c(a_s) with a q-dim
+    code and arbitrary per-token linear readouts, centered rank <= q. THIS is the code-
+    expansion test. Capped at S-1: report alongside an S-saturation check."""
+    c = per_token_centered(acts, exclude_positions)      # = row(action)-centering of M
+    M = c.reshape(c.shape[0], -1).double()
+    G = M @ M.T / max(M.shape[0] - 1, 1)
+    lam = torch.linalg.eigvalsh(G).clamp_min(0).flip(0)
+    return lam.cpu().numpy()
+
+def even_part_fraction(diff_plus, diff_minus, exclude_positions=None):
+    """Antithetic pairs. diff_plus/minus: (n, n_tok, d) diffs vs the SAME zero-action
+    reference for actions +a and -a (matched rows). ||(d(a)+d(-a))/2||^2 over mean||d||^2.
+    Exactly 0 for any response linear in a; a direct meter of even-order nonlinearity."""
+    p = diff_plus.detach().float(); m = diff_minus.detach().float()
+    keep = _keep_tokens(p.shape[1], exclude_positions)
+    p = p[:, keep, :].reshape(p.shape[0], -1)
+    m = m[:, keep, :].reshape(m.shape[0], -1)
+    even = 0.5 * (p + m)
+    denom = 0.5 * (p.pow(2).sum(-1) + m.pow(2).sum(-1))
+    return float((even.pow(2).sum(-1) / denom.clamp_min(1e-12)).mean())
+
+def variance_fraction(acts, exclude_positions=None):
+    """The protocol's Arm A metric: across-action variance (mean over kept tokens of the
+    per-token across-action variance trace) as a FRACTION of total pooled variance.
+    Scale-invariant; the only depth-comparable form of the variance readout."""
+    a = acts.detach().float()
+    keep = _keep_tokens(a.shape[1], exclude_positions)
+    a = a[:, keep, :]
+    num = float(a.var(dim=0, unbiased=True).sum(dim=-1).mean())
+    A = a.reshape(-1, a.shape[-1])
+    tot = float(A.var(dim=0, unbiased=True).sum())
+    return num / max(tot, 1e-12)
+
+def ln_normalized(acts, eps=1e-6):
+    """Parameter-free per-vector LayerNorm. The read-relevant view of the residual stream:
+    every consumer (next block pre-LN, predictor_norm) reads through LayerNorm, so raw
+    late-block magnitude is invisible to the output."""
+    a = acts.detach().float()
+    return (a - a.mean(-1, keepdim=True)) / (a.std(-1, keepdim=True) + eps)
+
 @torch.no_grad()
 def assert_real_checkpoint(encoder, predictor,
                            predictor_depth=24, action_dim=7, init_std=0.02):

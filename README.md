@@ -33,10 +33,12 @@ checkpoint to `/content` once per session (free-tier Drive cannot hold 11.76 GB)
   pipeline on real weights and sketches the depth/rank profile. Reports, per block, the
   residual variance the action drives on patch tokens, the action-vs-state-swap ratio, and the
   effective rank of the action-induced difference vectors.
-- **Phase 2b** (a small DROID sample): the statistical pilot. Many real scenes, the empirical-
-  distribution action null, a state-swap control, a conservative matched-norm null, bootstrap
-  CIs, the frozen-gate readout, and the power calculation. The DROID loader prints its schema
-  first so field-name mismatches are caught cleanly.
+- **Phase 2b** (12 real DROID scenes from `p1_droid_pilot_v1.npz`, a locally verified 1.4 MB
+  sample shipped in this repo -- no TFDS, no dataset libraries): the statistical pilot.
+  Empirical-distribution action sweeps with antithetic pairs, resampled-real-state and
+  matched-norm controls, per-token-centered spectra, the mode-s code-expansion test, per-block
+  write attribution, bootstrap CIs, both gates (original + norm-matched excess), and the power
+  calculation. Estimators follow the adversarial review in PRE_REGISTRATION.md section 10.1.
 
 `P1_phase2a_colab.ipynb` is the standalone 2a notebook, kept for reference.
 
