@@ -356,3 +356,33 @@ separable from the encoder (they are literally separate trees), and carries the 
 pathway, so the Section-9 kill criterion is NOT triggered. But no claim may be made until a
 real `state_dict` is loaded and `assert_real_checkpoint(encoder, predictor)` passes; that
 automated check is an aid, not a substitute for the reserved human attestation H1.
+
+---
+
+## 9. Phase 1 exit gate: PASSED against real weights (2026-07-23)
+
+Ran on Colab CPU (torch 2.11.0+cpu) against the official `vjepa2-ac-vitg.pt` (11.76 GB,
+`dl.fbaipublicfiles.com`). Checkpoint top-level keys:
+`encoder, predictor, opt, scaler, target_encoder, epoch, loss, batch_size, world_size, lr`
+(a full training checkpoint; `opt` and `target_encoder` explain the 11.76 GB size).
+
+- **R7 predictor:** `missing_keys = []`, `unexpected_keys = []` (predictor `state_dict`
+  populates the verified tree exactly). `action_encoder.weight` std = **0.0604** vs 0.02 init
+  (conditioning pathway populated by trained weights, not fresh init). PREDICTOR CHECKS: PASS.
+- **Frame-causal gate:** `per_frame_max_delta = [0.0, 0.0, 26.54, 187.55]` for a frame-2
+  perturbation. Frames `< t` exactly zero; frames `>= t` nonzero and growing forward.
+  Block-causal wiring and the `[action, state, patch]` token indexing are confirmed on real
+  weights.
+- **Encoder (Phase-2 prep):** `embed_dim 1408`, `missing 0`, `unexpected 0` (clean load).
+  `assert_real_checkpoint` PASS.
+- **Verified-against-weights site table:** predictor 24 blocks -> 78 sites (72 block sites +
+  6 conditioning modules); encoder 40 blocks -> 120 sites; total **198**.
+
+**H1 (reserved, human).** The automated aids pass and support checkpoint identity and
+no-fresh-init; the "no contaminating fine-tune" attestation remains the human's to sign. The
+weights are the official public release, downloaded directly and hash-consistent with the
+11.76 GB training checkpoint.
+
+**Gate outcome: GO to Phase 2.** Confirmed constants for the pilot: `action_dim = 7`,
+`state_dim = 7`, predictor width 1024, depth 24, encoder embed 1408; at 256px/patch16 the
+per-frame token stride is 258 = `[action, state] + 256 patches` (K=2, extrinsics off).
