@@ -471,7 +471,7 @@ def assert_real_checkpoint(encoder, predictor,
     assert predictor.action_encoder.in_features == action_dim
     assert predictor.predictor_embed.in_features == encoder.embed_dim
     assert getattr(predictor, "is_frame_causal", True) and not getattr(predictor, "use_extrinsics", False)
-    w = predictor.action_encoder.weight
+    w = predictor.action_encoder.weight.detach()
     assert w.std().item() > init_std + 0.005, (
         f"action_encoder.weight std={w.std().item():.4f} looks like fresh init "
         f"(~{init_std}); state_dict did not populate the conditioning pathway")
