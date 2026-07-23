@@ -21,19 +21,24 @@ No GPU is needed for the gate. The 11.76 GB checkpoint is loaded with `mmap=True
 modules are built standalone, so RAM stays within free-tier limits and `xformers` is not
 required. **R7's automated checks are an aid, not the reserved human attestation H1.**
 
-## Phase 2a: first look inside the predictor (one real robot scene)
+## Phase 2 pilot (2a + 2b in one notebook)
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/grewalsk/p1-vjepa2-predictor/blob/main/P1_phase2a_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/grewalsk/p1-vjepa2-predictor/blob/main/P1_phase2_colab.ipynb)
 
-`P1_phase2a_colab.ipynb` takes the real Franka trajectory shipped with the vjepa2 repo, freezes
-the scene, sweeps the action, and hooks all 24 predictor blocks during the sweep (Meta's own
-example only reads the final output). It reports, per block: the residual variance the action
-drives on patch tokens, the action-vs-state-swap ratio (action specificity), and the effective
-rank of the action-induced difference vectors. Reuses the Phase-1 Drive-cached checkpoint, so
-no second download. This validates the internal-hook pipeline on real weights and sketches the
-depth/rank profile on a single scene; it is not the statistical pilot. The empirical-
-distribution null, multi-scene pooling, and power calculation (Phase 2b) need a small DROID
-sample.
+`P1_phase2_colab.ipynb` hooks all 24 predictor blocks during an action sweep (Meta's own
+example only reads the final output). It runs top to bottom on an L4 GPU and downloads the
+checkpoint to `/content` once per session (free-tier Drive cannot hold 11.76 GB).
+
+- **Phase 2a** (one real Franka scene, bundled with the repo): validates the internal-hook
+  pipeline on real weights and sketches the depth/rank profile. Reports, per block, the
+  residual variance the action drives on patch tokens, the action-vs-state-swap ratio, and the
+  effective rank of the action-induced difference vectors.
+- **Phase 2b** (a small DROID sample): the statistical pilot. Many real scenes, the empirical-
+  distribution action null, a state-swap control, a conservative matched-norm null, bootstrap
+  CIs, the frozen-gate readout, and the power calculation. The DROID loader prints its schema
+  first so field-name mismatches are caught cleanly.
+
+`P1_phase2a_colab.ipynb` is the standalone 2a notebook, kept for reference.
 
 ## Files
 
