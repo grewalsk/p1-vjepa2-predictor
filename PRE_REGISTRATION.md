@@ -386,3 +386,50 @@ weights are the official public release, downloaded directly and hash-consistent
 **Gate outcome: GO to Phase 2.** Confirmed constants for the pilot: `action_dim = 7`,
 `state_dim = 7`, predictor width 1024, depth 24, encoder embed 1408; at 256px/patch16 the
 per-frame token stride is 258 = `[action, state] + 256 patches` (K=2, extrinsics off).
+
+---
+
+## 10. Phase 2a single-scene sketch (2026-07-23) -- EXPLORATORY, pilot, not evidence
+
+Run on Colab L4, real weights, the bundled Franka scene. S=64 actions uniform in
+[-0.075, 0.075]^7 vs zero-action reference; readout = patch tokens only at resid_post
+(pre-final-norm), conditioning tokens excluded; state-swap control = matched box perturbation
+of the state token at fixed real action. Numbers below are read from the run's table and plots.
+
+Observations:
+- **Action-specificity control behaved.** action/state-swap variance ratio >= ~30 at every
+  block: ~97 at blk0 (consistent with same-frame attention reading the action token in the
+  first block), declining to ~30 by blk8, local peak ~62 near blk13, settling ~33-36 through
+  blk23.
+- **Raw action-attributable variance grows monotonically with depth**: near 0 through ~blk12,
+  then 2259.7 (blk20), 3786.6 (21), 6849.6 (22), 9879.0 (23); state-swap stays <= ~300. This
+  is UNNORMALIZED; residual-norm growth with depth inflates it, and the protocol's metric is
+  the variance fraction. No H1b conclusion is drawn from this curve.
+- **Rank of pooled (action x token) diffs**: participation effective count ~2-5 (blk0-6),
+  crosses d_a = 7 near blk7, ~11-16 mid-trunk, peak 33.1 (blk21), 17.8 (blk23); max ~3.2% of
+  width 1024 (far under the 0.15 gate). Numerical rank (1% threshold) ~50-70 deep, peak 108.
+
+Tentative reads (to be tested in 2b, not asserted):
+- H1a-routing: consistent with "low-rank yet super-d_a" (expanded beyond the linear input
+  head's 7-dim image, far below width). Caveat: pooled rank conflates spatial footprint
+  diversity with action-code rank.
+- H1b: no contiguous band in the raw-variance profile, hinting localization may fail (outcome
+  cell 4), but this must be re-read on the normalized fraction and decided causally by Arm B.
+
+Caveats: single scene; single operating point; uniform sweep box, not the empirical action
+distribution (rotation dims swept although DROID actions rarely rotate); action swept around
+zero while state was perturbed around a real pose (operating-point asymmetry in the ratio);
+numerical rank threshold-sensitive at S=64.
+
+Metric changes mandated for 2b (pre-committed before 2b runs):
+1. Report the action-attributable variance FRACTION (across-action variance over total
+   variance) per block, alongside raw.
+2. Report token-averaged-diff rank AND pooled rank separately (disambiguates action-code rank
+   from spatial-footprint diversity).
+3. Sweep from the empirical DROID action distribution; report its per-dim std.
+4. Calibrate the state-swap to the empirical state distribution (per-dim std), not a fixed box.
+5. Keep the act/state ratio and add the on-manifold action-null ratio as the primary gate
+   quantity.
+
+An adversarial review of these three reads is running; its verdicts amend this section when
+they land, before 2b is executed.
