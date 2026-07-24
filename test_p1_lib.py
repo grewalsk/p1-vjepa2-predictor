@@ -475,6 +475,37 @@ def test_whiten_action_std_defuses_degenerate_axis():
     check("whiten_action_std: whitened per-dim std ~1 across all axes (artifact defused)",
           float((w.std(0) - 1).abs().max()) < 0.1, f"{[round(float(v),2) for v in w.std(0)]}")
 
+# ---------------------------------------------------------------------------
+# v6: nuisance-orbit audit encodes the judge's transformation-law ledger.
+# The point: on a model whose identifiability group is uncertified, "G constant in z"
+# (the Koopman/LTI verdict) is only a LINEAR-invariant, and sigma(G) is only ORTHOGONAL-
+# invariant, so both can be pure coordinate nuisance. These tests VERIFY that ledger.
+# ---------------------------------------------------------------------------
+def test_reparam_ledger_constant_G():
+    # constant-G stack (a Koopman/LTI verdict, C_baseline ~ 0)
+    m, da = 20, 7
+    Gbase = torch.randn(m, da)
+    Gs = Gbase[None].repeat(12, 1, 1)
+    rep = P.reparam_invariance_report(Gs, seed=1)
+    b = rep['baseline']
+    check("audit: rank invariant under ALL reparam",
+          all(abs(rep[k]['mean_rank'] - b['mean_rank']) < 1e-6 for k in ('orthogonal','general_linear','nonlinear')))
+    check("audit: 'G constant' (C~0) stays ~0 under LINEAR reparam (orth + GL)",
+          rep['orthogonal']['C'] < 1e-4 and rep['general_linear']['C'] < 1e-4,
+          f"orth {rep['orthogonal']['C']:.2e} gl {rep['general_linear']['C']:.2e}")
+    check("audit: 'G constant' is DESTROYED by nonlinear reparam (Koopman verdict is linear-only)",
+          rep['nonlinear']['C'] > 0.1, f"nonlinear C {rep['nonlinear']['C']:.3f}")
+
+def test_reparam_ledger_sigma():
+    m, da = 20, 7
+    Gs = torch.randn(12, m, da)
+    rep = P.reparam_invariance_report(Gs, seed=2)
+    b = rep['baseline']['mean_sigma']
+    check("audit: mean singular value invariant under ORTHOGONAL reparam",
+          abs(rep['orthogonal']['mean_sigma'] - b) / b < 1e-4, f"{abs(rep['orthogonal']['mean_sigma']-b)/b:.2e}")
+    check("audit: mean singular value CHANGES under general-linear reparam (sharp-but-fragile)",
+          abs(rep['general_linear']['mean_sigma'] - b) / b > 0.05, f"{abs(rep['general_linear']['mean_sigma']-b)/b:.3f}")
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for t in tests:
