@@ -396,6 +396,58 @@ def jacobian_spectrum(fn, a0, center=None):
     return torch.linalg.svdvals(J).cpu().numpy()
 
 # =====================================================================================
+# [P1ADD-v5] Control-operator state-geometry (chosen avenue, 2026-07-23).
+#
+# Decision from the next-avenue research fleet: the linearity-in-a headline is
+# NON-DISCRIMINATING (control-affine, bilinear, and Koopman-lifted-linear are all affine
+# in a at fixed z), and the pilot's rank is bounded by d_a and is NOT Cui's k (dropped).
+# The discriminating object is the STATE-dependence of the exact action-Jacobian
+# G(z) = dP/da: constant across states => discovered Koopman/LTI linearization; state-
+# varying => control-affine proper. This axis is orthogonal to the small-action artifact
+# (it is a derivative in z at fixed on-manifold action), and autodiff G is EXACT so the
+# constant-vs-varying test is powered even at ~12 states.
+# =====================================================================================
+
+def input_jacobian(fn, a0):
+    """EXACT action-Jacobian G = d fn / d a at a0 via autodiff. fn: (d_a,) -> (m,).
+    Returns the full (m, d_a) matrix (jacobian_spectrum returns only its singular values).
+    G(z)'s across-state variation discriminates the control formalism; its SVD gives the
+    energy Hessian factor H = 2 G^T G (rank <= d_a)."""
+    a0 = a0.detach().clone().requires_grad_(True)
+    J = torch.autograd.functional.jacobian(fn, a0)
+    return J.reshape(-1, a0.numel())
+
+def whiten_action_std(action_pool, floor_frac=1e-3):
+    """Per-dim std of the empirical action pool, for whitening action coordinates before
+    building G (PRE_REG s11 bug 3: one Euler axis ~100x the others otherwise dominates the
+    Jacobian). Probe with perturbations scaled by this std so all d_a axes contribute
+    comparably. Returns (std_per_dim, floored) where `floored` guards near-degenerate axes."""
+    p = action_pool.detach().float() if torch.is_tensor(action_pool) else torch.tensor(np.asarray(action_pool), dtype=torch.float32)
+    std = p.std(0)
+    floored = std.clamp_min(floor_frac * std.max().clamp_min(1e-12))
+    return std, floored
+
+def across_state_variation(Gs):
+    """Gs: (S, m, d_a) stack of per-state action-Jacobians in a SHARED basis (physical action
+    input, fixed output basis; no Procrustes needed). Returns
+      C = mean_s ||G_s - Gbar||_F / ||Gbar||_F.
+    C ~ 0  => constant-G  (Koopman / LTI-lifted latent dynamics, a DISCOVERED linearization);
+    C >> 0 => state-dependent control operator (control-affine proper).
+    Calibrate against a null from autodiff round-off and a label-permutation bootstrap."""
+    G = Gs.detach().float() if torch.is_tensor(Gs) else torch.tensor(np.asarray(Gs), dtype=torch.float32)
+    Gbar = G.mean(0, keepdim=True)
+    den = Gbar.flatten().norm().clamp_min(1e-12)
+    return float(((G - Gbar).flatten(1).norm(dim=1) / den).mean())
+
+def energy_hessian_from_jacobian(G):
+    """Exact action-Hessian of the squared-error planning energy for a control-affine step:
+    H = 2 G^T G (constant in a, PSD, rank <= d_a). Its eigenvalues are 2 sigma_i(G)^2 (the
+    energy-bowl curvatures) and cond(H|range) is the CEM-conditioning proxy (report as
+    suggestive: cond->steps is a gradient-descent result imported into derivative-free CEM)."""
+    G = G.detach().float() if torch.is_tensor(G) else torch.tensor(np.asarray(G), dtype=torch.float32)
+    return 2.0 * (G.T @ G)
+
+# =====================================================================================
 # [P1ADD-v3] AC token layout + gate assertions (from source verification 2026-07-23).
 #
 # The action is NOT an additive residual modulation. VisionTransformerPredictorAC interleaves

@@ -439,6 +439,42 @@ def test_ln_normalized_unit_stats():
     check("ln_normalized: per-vector mean ~0 and std ~1",
           float(n.mean(-1).abs().max()) < 1e-4 and abs(float(n.std(-1).mean()) - 1) < 1e-2)
 
+# ---------------------------------------------------------------------------
+# v5: control-operator state-geometry (chosen avenue)
+# ---------------------------------------------------------------------------
+def test_input_jacobian_exact_linear():
+    m, da = 20, 7
+    W = torch.randn(m, da)
+    def fn(a): return W @ a + torch.randn(m) * 0  # linear map
+    G = P.input_jacobian(fn, torch.zeros(da))
+    check("input_jacobian: recovers the exact linear map (m, d_a)",
+          G.shape == (m, da) and torch.allclose(G.float(), W, atol=1e-5))
+
+def test_across_state_variation_constant_vs_varying():
+    m, da = 16, 7
+    Gbase = torch.randn(m, da)
+    Gs_const = Gbase[None].repeat(12, 1, 1)                      # Koopman: identical across states
+    check("across_state_variation: ~0 for constant G (Koopman/LTI)",
+          P.across_state_variation(Gs_const) < 1e-6, f"{P.across_state_variation(Gs_const):.2e}")
+    Gs_vary = Gbase[None] + 0.5 * torch.randn(12, m, da)        # state-varying control operator
+    C = P.across_state_variation(Gs_vary)
+    check("across_state_variation: > 0 for state-varying G (control-affine)", C > 0.05, f"{C:.3f}")
+
+def test_energy_hessian_is_2GtG():
+    m, da = 12, 7
+    G = torch.randn(m, da)
+    H = P.energy_hessian_from_jacobian(G)
+    check("energy_hessian: H == 2 G^T G, PSD, rank <= d_a",
+          torch.allclose(H, 2*G.T@G, atol=1e-5) and int((torch.linalg.eigvalsh(H) > 1e-4).sum()) <= da)
+
+def test_whiten_action_std_defuses_degenerate_axis():
+    # one axis ~100x the others (the Euler-wraparound artifact)
+    pool = torch.randn(500, 7) * torch.tensor([0.003,0.004,0.005,0.68,0.010,0.014,0.020])
+    std, floored = P.whiten_action_std(pool)
+    w = (pool / floored)   # whitened coordinates
+    check("whiten_action_std: whitened per-dim std ~1 across all axes (artifact defused)",
+          float((w.std(0) - 1).abs().max()) < 0.1, f"{[round(float(v),2) for v in w.std(0)]}")
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for t in tests:

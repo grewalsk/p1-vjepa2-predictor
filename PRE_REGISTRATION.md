@@ -534,3 +534,53 @@ calibrated action-vs-state routing number.
 Provisional outcome-table lean: cell 4 (low-rank but distributed) on the H1a/H1b axes, pending
 the main run with the fixed comparator and adequate scenes. H1c (separability) and H1d
 (persistence) not yet tested.
+
+---
+
+## 12. Avenue decision (2026-07-23): control-operator state-geometry
+
+Decided by the next-avenue research fleet (5 lenses + senior synthesis). The Phase-2a/2b
+"action routing is low-rank / control-affine" framing is REDIRECTED, not deepened.
+
+**Corrections to the working hypothesis (own them):**
+- DROP the identification of the predictor action-Jacobian rank with Cui's k. rank(G) <= d_a
+  = 7 (action-reachable subdimension); Cui's k is the encoder embedding width. Object
+  mismatch, exactly the trap PRE_REG s2 warned about. Consequence (c) is dead.
+- The linearity-in-a headline is NON-DISCRIMINATING: control-affine, bilinear, and
+  Koopman-lifted-linear are all affine in a at fixed z. even-part fraction, quadratic energy,
+  and fast CEM all follow from affinity-in-a alone and separate no formalism. The small-DROID-
+  action objection concerns d^2P/da^2 near 0, the one axis carrying zero formalism info.
+
+**The discriminating object: the STATE-dependence of the exact action-Jacobian G(z)=dP/da.**
+Koopman/LTI: dG/dz = 0 (G constant). Bilinear: G linear in z. Control-affine: G arbitrary in
+z. This axis is orthogonal to the small-action artifact (a z-derivative at fixed on-manifold
+action), and autodiff G is EXACT so the constant-vs-varying test is powered even at S=12.
+
+**Decisive next experiment (infra in p1_lib v5: input_jacobian, across_state_variation,
+whiten_action_std, energy_hessian_from_jacobian):** per DROID state z_s, whiten action coords,
+build G_s = dP/da at the predictor_proj OUTPUT (kills the LN/norm-growth confound) at a in
+{0, a_real}. Primary statistic C = mean_s ||G_s - Gbar||_F / ||Gbar||_F vs a permutation null.
+- C ~ 0            => DISCOVERED constant-G Koopman linearization (headline; "simple in latent
+                     space"; refutes "just a smooth net near 0" since generic nets have dG/dz != 0).
+- C >> 0, low-dim  => state-dependent control operator (control-affine proper; upgraded).
+- C ~ null, curv large => honest null (locally-linear smooth net, no special state structure).
+Side-axis (free): Delta_s = ||G_s(a_real)-G_s(0)||/||G_s(0)|| is the measured action curvature
+(the Lens-5 objection quantified, not argued). Secondary (free): H_s = 2 G_s^T G_s, report
+sigma_i(G_s) (rank <= 7), cond(H_s|range), correlate with cem_plan iters to REACHABLE goals
+z_goal = P(z_s, a*) (suggestive only: cond->steps is a GD result imported into CEM; horizon-8
+capability is governed by the drift F carrying z into range(G)).
+Do NOT attempt bilinear-vs-control-affine (linear-vs-nonlinear-in-z) at S=12; defer to the
+main run's many well-spread states.
+
+**Arm D (object permanence): gated hybrid, not a full pivot.** Cheap feasibility probe FIRST
+(does the AC predictor track the occluded disc; is the persistence gap nonzero) before any
+patching; if the gap ~ 0, OccludedBounce is OOD/task-at-floor and Arm D dies. Persistence-
+circuit EV bimodal (~35-45% striking novel result; else low-impact null). The diffuse-action
+pilot is weak evidence about persistence locality (copy circuits localize even when other
+routing is distributed).
+
+**Novelty:** partially-scooped on vocabulary (Koopman/bilinear/control-affine latent dynamics
+are published only as IMPOSED architectures, e.g. Koopman Dreamer 2607.19719); OPEN on the
+claim (adjudicating which formalism an UNCONSTRAINED pretrained JEPA predictor converged to,
+by probing dG/dz, is unclaimed). The "discovered vs imposed" wedge is sharp and closing.
+P(main-track paper within scope) ~ 0.4.
