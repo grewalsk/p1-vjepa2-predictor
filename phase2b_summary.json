@@ -1,0 +1,30 @@
+{
+  "peak_block": 21,
+  "n_scenes": 12,
+  "vf_ln(action) @peak": {
+    "mean": 0.0004478448108932503,
+    "lo": 0.0003037384233006832,
+    "hi": 0.0005946305366403017
+  },
+  "act / matched-norm null @peak   (GATE >= 3.0)": {
+    "mean": 24.110005242386066,
+    "lo": 2.6173814161592803,
+    "hi": 63.932771474390144
+  },
+  "act / state uncalibrated @peak": {
+    "mean": 0.2152282908160812,
+    "lo": 0.1433465025245827,
+    "hi": 0.2927195046298407
+  },
+  "mode-s rank @peak   (7 = no code expansion)": {
+    "mean": 9.916666666666666,
+    "lo": 7.75,
+    "hi": 12.333333333333334
+  },
+  "even-part fraction @peak   (0 = purely linear)": {
+    "mean": 0.07815939857914213,
+    "lo": 0.05038389887426303,
+    "hi": 0.10544704139172657
+  },
+  "power": "d=0.32, ~scenes for 80% power = 77"
+}

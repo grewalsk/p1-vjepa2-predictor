@@ -492,3 +492,45 @@ ratio (state perturbations rescaled so the embedding-space step matches the pair
 embedding step, or equivalently the measured ratio divided by ||W_a||_F^2/||W_s||_F^2 for
 box sweeps) is the calibrated form, required >= 3.0 at the peak block with bootstrap CI,
 robust across >= 3 operating points.
+
+---
+
+## 11. Phase 2b pilot result (2026-07-23) -- EXPLORATORY, 12 DROID scenes, not evidence
+
+On-manifold empirical-action sweep (S=32) vs matched-norm null, per-token-centered
+LN-normalized patch-token residuals, all 24 blocks, 12 real DROID scenes. Pilot only; the
+protocol forbids reporting the point estimate as evidence.
+
+**Primary finding: the action effect is FLAT across depth.** vf_ln(action), mode-s rank, and
+even-part fraction are all constant over blocks (across-block CV 0.12-0.19; corr(block,
+action-effect) = +0.03). No mixing-onset, no localized band. This is the read least sensitive
+to the null issues below (within-run consistency across 24 blocks). It points at **H1b
+(localization) FAILING -- the action is routed diffusely, i.e. outcome cell 4 (low-rank but
+distributed).**
+
+**Routing is predominantly linear and modest-dimensional.** even-part fraction ~7.6% (response
+~92% linear in the action), rising with depth (corr +0.54, ~5%->10%, consistent with MLPs
+accumulating nonlinearity late). mode-s rank ~11.5, but noise-inflated at S=32 / 1% threshold;
+with a ~92%-linear response there is no strong evidence of genuine code expansion beyond input.
+
+**The primary gate is marginal, on an unstable comparator.** The reported "act/matched-null =
+24.1" was mean-of-ratios and is an artifact: 10/12 scenes give 1-5, two blow up (26.9, 233.1)
+because the matched-norm null nearly vanished (null-variance spread 85x across scenes). Honest
+estimate: median 3.7 / ratio-of-means 3.9, sitting ON the 3.0 gate. This is confound B2
+(matched-norm null under-propagation) manifesting; the null must be the on-manifold empirical
+null and the ratio must be ratio-of-means with a null-floor.
+
+**Underpowered:** ~77 scenes for 80% power on the noisy mean-of-ratios metric; far fewer once
+the comparator is stabilized.
+
+**Bugs the pilot exposed (fix before the main run):** (1) gate = ratio-of-means (or median)
+with a null-floor, never mean-of-ratios; (2) primary null = on-manifold empirical-action null,
+not matched_norm_null; (3) audit the empirical action-pool dimensionality -- the extract log
+showed one Euler rotation dim ~100x the others (likely wraparound artifact), so the sweep may
+be dominated by one degenerate axis; verify poses_to_diff (matrix-based) output std per dim;
+(4) add the embedding-norm-matched state sweep (already in the patched notebook) for the
+calibrated action-vs-state routing number.
+
+Provisional outcome-table lean: cell 4 (low-rank but distributed) on the H1a/H1b axes, pending
+the main run with the fixed comparator and adequate scenes. H1c (separability) and H1d
+(persistence) not yet tested.
